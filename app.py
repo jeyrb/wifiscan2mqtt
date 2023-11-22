@@ -1,8 +1,7 @@
 import paho.mqtt.client as mqtt
+import subprocess
 import structlog
 import asyncio
-from py_wifi_helper import yy_wifi_helper
-from py_wifi_helper.yy_wifi_helper import WIFIAP
 
 log = structlog.get_logger()
 
@@ -55,13 +54,23 @@ class MqttClient:
         self.log.info("Message received", msg=msg)
 
 
-def scan(device="en0"):
-    obj = yy_wifi_helper.YYWIFIHelper()
-    query = obj.getAPList(device)
-
-    if "status" in query and query["status"]:
-        for item in query["list"]:
-            print(item[WIFIAP.SSID],item[WIFIAP.CHANNEL_BAND],item[WIFIAP.CHANNEL_NUMBER])
+def scan(device="wlan0",timeout=90):
+    ret = subprocess.run(('/usr/bin/nmcli','-m','multiline','-c','no','--fields','all','device','wifi','list'),
+			  capture_output=True,timeout=timeout,text=True)
+    nets=[]
+    net=None
+    for l in ret.stdout.split('\n'):
+      if l and ':' in l:
+        tag,value=l.split(':',1)
+        if tag == 'NAME':
+            if net is not None:
+                nets.append(net)
+            net={}
+        net[tag]=value.strip()
+    if net:
+        nets.append(net)
+    for net in nets:
+        print(net)
 
 
 if __name__ == "__main__":
